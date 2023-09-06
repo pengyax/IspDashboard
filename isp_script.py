@@ -1,6 +1,15 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime,timedelta
+import calendar
 
+def generate_lastday(ym):
+    date = datetime.strptime(ym, '%Y-%m')
+    days = calendar.monthrange(date.year, date.month)[1]
+    date = date.replace(day=days)
+    date = date.strftime('%Y-%m-%d')
+    return date
+    
 
 def raw_process(df_jp,df_eu,df_anz,mapping_name,mapping_Exemption,std = '2022-01-01'):
     df_anz = (
@@ -56,10 +65,10 @@ def cartesian (Market,Div,stdate,eddate):
 
 if __name__ == "__main__":
 
-    df_raw_jp = pd.read_excel('./08/PQR2023_July_Medline Vendor Asia.xlsx',sheet_name=2,usecols=list(range(0,18)),skiprows=2)
-    df_raw_eu = pd.read_excel('./08/EU complaint details.xlsx')
-    df_raw_anz = pd.read_excel('./08/ANZ Product Complaints Summary.xlsx')
-    mapping_list = pd.read_excel('./VendorNameMapping.xlsx',sheet_name=0)
+    df_raw_jp = pd.read_excel('../09/PQR2023_Aug_Medline Vendor Asia.xlsx',sheet_name=2,usecols=list(range(0,18)),skiprows=2)
+    df_raw_eu = pd.read_excel('../09/EU complaint details.xlsx')
+    df_raw_anz = pd.read_excel('../09/ANZ Product Complaints Summary.xlsx')
+    mapping_list = pd.read_excel('../VendorNameMapping.xlsx',sheet_name=0)
     mapping_name = dict(zip(mapping_list['Facility'],mapping_list['Vendor Name']))
     mapping_Exemption = dict(zip(mapping_list['Facility'],mapping_list['Exemption'])) 
      
@@ -176,9 +185,11 @@ if __name__ == "__main__":
     .assign(Market = 'EU')
     )
     
-    eddata = '2023-07-31'
+    
     stdate = '2022-01'
-    eddate = '2023-07'
+    eddate = '2023-08'
+    
+    last_date = generate_lastday(eddate)
     
     (
     pd.concat([df_anz,df_jp,df_eu])
@@ -187,7 +198,7 @@ if __name__ == "__main__":
     .loc[:,sort_list]
     .assign(Division = lambda d : d['Division'].map(lambda x: 0 if pd.isna(x) else int(x)))
 #     .astype({'Division':'Int64'})
-    .query('If_mfg_complaints == "Y" and Exemption != "Y" and `Receipt Date` <= @eddata')
+    .query('If_mfg_complaints == "Y" and Exemption != "Y" and `Receipt Date` <= @last_date')
     .to_excel('ISPdatabase.xlsx',index=False)
     )
     
@@ -195,6 +206,3 @@ if __name__ == "__main__":
     Div = [10,12,14,15,17,18,20,21,22,29,30,32,33,34,35,40,41,42,50,51,52,55,60,65,70,71,72,75,80,81,82,0]
     
     cartesian(Market,Div,stdate,eddate).to_excel('cartesian.xlsx',index=False)
-    
-    
-    
