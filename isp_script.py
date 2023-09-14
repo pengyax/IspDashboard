@@ -4,17 +4,17 @@ from datetime import datetime,timedelta
 import calendar
 
 def generate_lastday(ym):
-    date = datetime.strptime(ym, '%Y-%m')
+    date = datetime.strptime(ym, '%Y-%m-%d')
     days = calendar.monthrange(date.year, date.month)[1]
     date = date.replace(day=days)
     date = date.strftime('%Y-%m-%d')
     return date
     
 
-def raw_process(df_jp,df_eu,df_anz,mapping_name,mapping_Exemption,std = '2022-01-01'):
+def raw_process(df_jp,df_eu,df_anz,stdate,eddate):
     df_anz = (
     df_anz
-    .query('`Date Complaint Received` >= @std')
+    .query('`Date Complaint Received` >= @stdate and `Date Complaint Received` <= @eddate')
     .assign(**{"Product Division" : lambda d : d['Product Division'].str.extract(r"(\d+)")[0].str[:2]})
     .loc[:,~df_anz.columns.str.contains('Unnamed')]
     .rename(columns=lambda x: x.replace('\n', ''))
@@ -26,7 +26,7 @@ def raw_process(df_jp,df_eu,df_anz,mapping_name,mapping_Exemption,std = '2022-01
 
     df_eu = (
     df_eu
-    .query('Date >= @std')
+    .query('Date >= @stdate and Date <= @eddate')
     # .assign(Division = lambda d : d['Prod-Line Code'].str.extract(r"(\d+)")[0].str[:2])
     .loc[:,eu_rename.keys()]
     .assign(If_mfg_complaints = 'Y',
@@ -36,7 +36,7 @@ def raw_process(df_jp,df_eu,df_anz,mapping_name,mapping_Exemption,std = '2022-01
 
     df_jp = (
     df_jp
-    .query('`Receipt Date` >= @std')
+    .query('`Receipt Date` >= @stdate and `Receipt Date` <= @eddate')
     .assign(Division = lambda d : d['Division'].str.extract(r"(\d+)")[0].str[:2])
     .assign(If_mfg_complaints = lambda d : d.apply(lambda s : 'Y' if s["QA：責任"] in (['In-process','Component']) and s['Issued by'] == 'Customer' else 'N', axis = 1),
             VendorName = lambda d : d['Facility'].map(mapping_name),
@@ -46,12 +46,45 @@ def raw_process(df_jp,df_eu,df_anz,mapping_name,mapping_Exemption,std = '2022-01
     print('ANZ', df_anz['Exemption'].isna().sum())
     print('EU', df_eu['Exemption'].isna().sum())
     
+    
     with pd.ExcelWriter(f'./rawData.xlsx') as writer:
         df_jp.to_excel(writer, sheet_name="JAPAN", index=False)
         df_anz.to_excel(writer, sheet_name="ANZ", index=False)
         df_eu.to_excel(writer, sheet_name="EU", index=False)
 
-    return df_jp,df_anz,df_eu
+    df_jp = (
+    df_jp
+    .rename(columns=jp_rename)
+    .assign(Market = 'JAPAN')
+    )
+    
+    df_anz = (
+    df_anz
+    .rename(columns=anz_rename)
+    .assign(Market = 'ANZ')
+    )
+    
+    df_eu = (
+    df_eu
+    .rename(columns=eu_rename)
+    .assign(Market = 'EU')
+    )
+    
+    
+    last_date = generate_lastday(eddate)
+    
+    (
+    pd.concat([df_anz,df_jp,df_eu])
+    .assign(Year = lambda d : d['Receipt Date'].dt.year,
+            Month = lambda d : d['Receipt Date'].dt.month)
+    .loc[:,sort_list]
+    .assign(Division = lambda d : d['Division'].map(lambda x: 0 if pd.isna(x) else int(x)))
+#     .astype({'Division':'Int64'})
+    .query('If_mfg_complaints == "Y" and Exemption != "Y" and `Receipt Date` <= @last_date')
+    .to_excel('ISPdatabase.xlsx',index=False)
+    )
+    
+    
 
 def cartesian (Market,Div,stdate,eddate):
     date_range = pd.date_range(start=stdate,end=eddate,freq='MS')
@@ -70,7 +103,7 @@ if __name__ == "__main__":
     df_raw_anz = pd.read_excel('../09/ANZ Product Complaints Summary.xlsx')
     mapping_list = pd.read_excel('../VendorNameMapping.xlsx',sheet_name=0)
     mapping_name = dict(zip(mapping_list['Facility'],mapping_list['Vendor Name']))
-    mapping_Exemption = dict(zip(mapping_list['Facility'],mapping_list['Exemption'])) 
+    mapping_Exemption = dict(zip(mapping_list['Facility'],mapping_list['Exemption']))
      
     jp_rename = {
     'PQR No.':'Complaint No',
@@ -165,43 +198,12 @@ if __name__ == "__main__":
     'If_mfg_complaints',
     'Exemption']
     
-    df_jp,df_anz,df_eu = raw_process(df_raw_jp,df_raw_eu,df_raw_anz,mapping_name,mapping_Exemption)
     
-    df_jp = (
-    df_jp
-    .rename(columns=jp_rename)
-    .assign(Market = 'JAPAN')
-    )
+    stdate = '2022-01-01'
+    eddate = '2023-08-31'
     
-    df_anz = (
-    df_anz
-    .rename(columns=anz_rename)
-    .assign(Market = 'ANZ')
-    )
-    
-    df_eu = (
-    df_eu
-    .rename(columns=eu_rename)
-    .assign(Market = 'EU')
-    )
-    
-    
-    stdate = '2022-01'
-    eddate = '2023-08'
-    
-    last_date = generate_lastday(eddate)
-    
-    (
-    pd.concat([df_anz,df_jp,df_eu])
-    .assign(Year = lambda d : d['Receipt Date'].dt.year,
-            Month = lambda d : d['Receipt Date'].dt.month)
-    .loc[:,sort_list]
-    .assign(Division = lambda d : d['Division'].map(lambda x: 0 if pd.isna(x) else int(x)))
-#     .astype({'Division':'Int64'})
-    .query('If_mfg_complaints == "Y" and Exemption != "Y" and `Receipt Date` <= @last_date')
-    .to_excel('ISPdatabase.xlsx',index=False)
-    )
-    
+    raw_process(df_raw_jp,df_raw_eu,df_raw_anz,stdate,eddate)
+      
     Market = ['ANZ','JAPAN','EU']
     Div = [10,12,14,15,17,18,20,21,22,29,30,32,33,34,35,40,41,42,50,51,52,55,60,65,70,71,72,75,80,81,82,0]
     
