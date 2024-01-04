@@ -10,7 +10,6 @@ def generate_lastday(ym):
     date = date.strftime('%Y-%m-%d')
     return date
     
-
 def raw_process(df_jp,df_eu,df_anz,stdate,eddate):
     df_anz = (
     df_anz
@@ -21,6 +20,7 @@ def raw_process(df_jp,df_eu,df_anz,stdate,eddate):
     .assign(If_mfg_complaints = 'Y',
             VendorName = lambda d : d['Supplier'].map(mapping_name),
             Exemption = lambda d : d['Supplier'].map(mapping_Exemption))
+    .assign(**{"Product Code" : lambda d : d['Product Code'].map(str).str.strip()})
     .query('~VendorName.isnull()')
     )
 
@@ -98,9 +98,9 @@ def cartesian (Market,Div,stdate,eddate):
 
 if __name__ == "__main__":
 
-    df_raw_jp = pd.read_excel('../09/PQR2023_Aug_Medline Vendor Asia.xlsx',sheet_name=2,usecols=list(range(0,18)),skiprows=2)
-    df_raw_eu = pd.read_excel('../09/EU complaint details.xlsx')
-    df_raw_anz = pd.read_excel('../09/ANZ Product Complaints Summary.xlsx')
+    df_raw_jp = pd.read_excel('../12/PQR2023_Nov_Medline Vendor Asia.xlsx',sheet_name=2,usecols=list(range(0,18)),skiprows=2)
+    df_raw_eu = pd.read_excel('../12/EU complaint details.xlsx')
+    df_raw_anz = pd.read_excel('../12/ANZ Product Complaints Summary.xlsx')
     mapping_list = pd.read_excel('../VendorNameMapping.xlsx',sheet_name=0)
     mapping_name = dict(zip(mapping_list['Facility'],mapping_list['Vendor Name']))
     mapping_Exemption = dict(zip(mapping_list['Facility'],mapping_list['Exemption']))
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     
     
     stdate = '2022-01-01'
-    eddate = '2023-08-31'
+    eddate = '2023-12-31'
     
     raw_process(df_raw_jp,df_raw_eu,df_raw_anz,stdate,eddate)
       
