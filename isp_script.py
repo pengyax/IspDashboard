@@ -27,7 +27,7 @@ def raw_process(df_jp,df_eu,df_anz,stdate,eddate):
     df_eu = (
     df_eu
     .query('Date >= @stdate and Date <= @eddate')
-    # .assign(Division = lambda d : d['Prod-Line Code'].str.extract(r"(\d+)")[0].str[:2])
+    .assign(Division = lambda d : d['Prod-Line Code'].str.extract(r"(\d+)")[0].str[:2])
     .loc[:,eu_rename.keys()]
     .assign(If_mfg_complaints = 'Y',
             VendorName = lambda d : d['Vendor'].map(mapping_name),
@@ -98,9 +98,9 @@ def cartesian (Market,Div,stdate,eddate):
 
 if __name__ == "__main__":
 
-    df_raw_jp = pd.read_excel('../12/PQR2023_Nov_Medline Vendor Asia.xlsx',sheet_name=2,usecols=list(range(0,18)),skiprows=2)
-    df_raw_eu = pd.read_excel('../12/EU complaint details.xlsx')
-    df_raw_anz = pd.read_excel('../12/ANZ Product Complaints Summary.xlsx')
+    df_raw_jp = pd.read_excel('../2024/01/PQR2024_Jan_Medline Vendor Asia.xlsx',sheet_name=2,usecols=list(range(0,18)),skiprows=2)
+    df_raw_eu = pd.read_excel('../2024/01/EU Complaint tracking file.xlsx',sheet_name=0)
+    df_raw_anz = pd.read_excel('../2024/01/ANZ Product Complaints Summary.xlsx')
     mapping_list = pd.read_excel('../VendorNameMapping.xlsx',sheet_name=0)
     mapping_name = dict(zip(mapping_list['Facility'],mapping_list['Vendor Name']))
     mapping_Exemption = dict(zip(mapping_list['Facility'],mapping_list['Exemption']))
@@ -199,12 +199,12 @@ if __name__ == "__main__":
     'Exemption']
     
     
-    stdate = '2022-01-01'
-    eddate = '2023-12-31'
+    stdate = '2023-01-01'
+    eddate = '2024-12-31'
     
     raw_process(df_raw_jp,df_raw_eu,df_raw_anz,stdate,eddate)
       
     Market = ['ANZ','JAPAN','EU']
-    Div = [10,12,14,15,17,18,20,21,22,29,30,32,33,34,35,40,41,42,50,51,52,55,60,65,70,71,72,75,80,81,82,0]
+    Div = [10,12,14,15,17,18,20,21,22,29,30,32,33,34,35,40,41,42,49,50,51,52,55,60,65,70,71,72,75,80,81,82,0]
     
     cartesian(Market,Div,stdate,eddate).to_excel('cartesian.xlsx',index=False)
